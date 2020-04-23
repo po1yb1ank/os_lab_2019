@@ -42,16 +42,26 @@ int main(int argc, char **argv) {
             seed = atoi(optarg);
             // your code here
             // error handling
+	    if (seed < 0){
+	      printf("error! Seed must be a positive number\n");
+	      return 1;
+	    }
             break;
           case 1:
             array_size = atoi(optarg);
             // your code here
             // error handling
+	    if (array_size < 0){
+	      printf("error! size of array must be more than 1!");
+	    }
             break;
           case 2:
             pnum = atoi(optarg);
             // your code here
             // error handling
+	    if (pnum < 0){
+	      printf("error! pipes number must be > 0"!);
+	    }
             break;
           case 3:
             with_files = true;
