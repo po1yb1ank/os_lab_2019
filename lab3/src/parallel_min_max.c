@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
             // your code here
             // error handling
 	    if (pnum < 0){
-	      printf("error! pipes number must be > 0"!);
+	      printf("error! pipes number must be > 0!");
 	    }
             break;
           case 3:
@@ -97,7 +97,11 @@ int main(int argc, char **argv) {
   int *array = malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
   int active_child_processes = 0;
-
+  int part = array_size/pnum;
+  int pipefd[2];
+  pipe(pipefd);
+  pid_t CurrentPID;
+  struct MinMax minMaxBuff;
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
@@ -108,13 +112,16 @@ int main(int argc, char **argv) {
       active_child_processes += 1;
       if (child_pid == 0) {
         // child process
-
         // parallel somehow
-
+	minMaxBuff = GetMinMax(array, i*part, (i == pnum - 1) ? array_size : (i + 1) * part);
         if (with_files) {
           // use files here
+	  FILE* outputFile = fopen("out.txt","a");
+	  fwrite(&minMaxBuff, sizeof(struct MinMax), 1, outputFile);
+	  fclose(outputFile);
         } else {
           // use pipe here
+	  write(pipefd[1], &minMaxBuff, sizeof(struct MinMax));
         }
         return 0;
       }
@@ -127,7 +134,8 @@ int main(int argc, char **argv) {
 
   while (active_child_processes > 0) {
     // your code here
-
+    close(pipefd[1]);
+    wait(NULL);
     active_child_processes -= 1;
   }
 
@@ -141,12 +149,22 @@ int main(int argc, char **argv) {
 
     if (with_files) {
       // read from files
+      FILE* outputFile = fopen("out.txt", "rb");
+      fseek(outputFile, i*sizeof(struct MinMax), SEEK_SET);
+      fread(&minMaxBuff, sizeof(struct MinMax), 1, outputFile);
+      printf("pnum:%i:\tmin:%7i     max:%i\n", i, minMaxBuff.min, minMaxBuff.max);
+      fclose(outputFile);
+      
     } else {
       // read from pipes
+      read(pipefd[0], &minMaxBuff, sizeof(struct MinMax));
+      printf("pnum:%i\tmin:%7i max:%i\n", i, minMaxBuff.min, minMaxBuff.max);
     }
 
-    if (min < min_max.min) min_max.min = min;
-    if (max > min_max.max) min_max.max = max;
+   if (minMaxBuff.min < min_max.min)
+     min_max.min = minMaxBuff.min;
+   if (minMaxBuff.max > min_max.max) 
+     min_max.max = minMaxBuff.max;
   }
 
   struct timeval finish_time;
