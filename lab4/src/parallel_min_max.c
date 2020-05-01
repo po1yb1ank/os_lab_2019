@@ -147,10 +147,9 @@ int main(int argc, char **argv) {
     close(pipefd[1]);
     if (alarmTime != -1){
       //create alarm evt
+      waitpid(child_pid, NULL, WNOHANG);
       signal(SIGALRM, procAlarm);
       alarm(alarmTime);
-      //waitpid(child_pid, NULL, WNOHANG);
-      wait(NULL);
       active_child_processes--;
     }
     else{
@@ -202,5 +201,5 @@ int main(int argc, char **argv) {
   return 0;
 }
 void procAlarm(int sig){
-  kill(child_pid, SIGKILL);
+  kill(-1, SIGKILL);
 }
