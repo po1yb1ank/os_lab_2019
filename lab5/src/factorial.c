@@ -21,7 +21,7 @@ int main(int argc, char **argv)
   int threads_num = 0;
   int fact_n = -1;
   int mod_n = 0;
-  pthread_t threads[threads_num];
+  pthread_t *threads;
   while (true) {
     int current_optind = optind ? optind : 1;
 
@@ -47,6 +47,7 @@ int main(int argc, char **argv)
             break;
           case 2:
             threads_num = atoi(optarg);
+	    threads = (pthread_t*) malloc(threads_num * sizeof(pthread_t));
             if (threads_num <= 0) {
                 printf("threads_num is a positive number\n");
                 return 1;

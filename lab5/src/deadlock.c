@@ -5,10 +5,15 @@
 
 int main(){
   //deadlock
-  
+  pthread_t thread;
+  pthread_t anotherThread;
   if (pthread_create(
 
 
 
   return 0;
+}
+void deadlock{
+	
+
 }
