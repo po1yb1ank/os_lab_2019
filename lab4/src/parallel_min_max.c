@@ -14,7 +14,15 @@
 
 #include "find_min_max.h"
 #include "utils.h"
-void procAlarm();
+pid_t *childPidArray;
+int pids = 0;
+void procAlarm(int sig){
+  for (int i = 0; i < pids; i++){
+    printf("killed process %d\n",childPidArray[i]);
+    kill(childPidArray[i], SIGKILL);
+  }
+  free(childPidArray);
+}
 int main(int argc, char **argv) {
   int seed = -1;
   int array_size = -1;
@@ -61,6 +69,7 @@ int main(int argc, char **argv) {
             pnum = atoi(optarg);
             // your code here
             // error handling
+	    pids = pnum;
 	    if (pnum < 0){
 	      printf("error! pipes number must be > 0!\n");
 	       return 1;
@@ -111,6 +120,7 @@ int main(int argc, char **argv) {
   int pipefd[2];
   pipe(pipefd);
   pid_t CurrentPID;
+  childPidArray = malloc(sizeof(pid_t) * pnum);
   struct MinMax minMaxBuff;
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
@@ -119,6 +129,7 @@ int main(int argc, char **argv) {
     pid_t child_pid = fork();
     if (child_pid >= 0) {
       // successful fork
+      childPidArray[i] = child_pid;
       active_child_processes += 1;
       if (child_pid == 0) {
         // child process
@@ -147,13 +158,14 @@ int main(int argc, char **argv) {
     close(pipefd[1]);
     if (alarmTime != -1){
       //create alarm evt
-      waitpid(child_pid, NULL, WNOHANG);
+      // waitpid(0, NULL, WNOHANG);
+      printf("lets kill %d childs with alarm of %d!\n", active_child_processes, alarmTime);
+      ualarm(alarmTime*1000, 0);
       signal(SIGALRM, procAlarm);
-      alarm(alarmTime);
       active_child_processes--;
     }
     else{
-      wait(NULL);
+       wait(NULL);
       active_child_processes -=1;
     }
   }
@@ -199,7 +211,4 @@ int main(int argc, char **argv) {
   printf("Elapsed time: %fms\n", elapsed_time);
   fflush(NULL);
   return 0;
-}
-void procAlarm(int sig){
-  kill(-1, SIGKILL);
 }
