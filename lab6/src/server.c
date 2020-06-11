@@ -12,13 +12,13 @@
 #include <sys/types.h>
 
 #include "pthread.h"
-
+pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
 struct FactorialArgs {
   uint64_t begin;
   uint64_t end;
   uint64_t mod;
 };
-
+int factorial = 1;
 uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
   uint64_t result = 0;
   a = a % mod;
@@ -34,9 +34,16 @@ uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
 
 uint64_t Factorial(const struct FactorialArgs *args) {
   uint64_t ans = 1;
-
   // TODO: your code here
-
+  struct FactorialArgs* str=(struct FactorialArgs*)args;
+  pthread_mutex_lock(&mut);
+  int buf=1;
+  for(int i=str->begin;i<=str->end;i++){
+    buf=((buf*i)%(str->mod));
+      printf("Buf - %d\n",buf);
+  }
+  factorial=(factorial*buf)%str->mod;
+  pthread_mutex_unlock(&mut);
   return ans;
 }
 
@@ -46,7 +53,7 @@ void *ThreadFactorial(void *args) {
 }
 
 int main(int argc, char **argv) {
-  int tnum = -1;
+  int tnum = -1;//threads number
   int port = -1;
 
   while (true) {
@@ -68,9 +75,15 @@ int main(int argc, char **argv) {
       case 0:
         port = atoi(optarg);
         // TODO: your code here
+	if (port < 0 || port > 65534){
+	  port = 20001;
+	}
         break;
       case 1:
         tnum = atoi(optarg);
+	if (tnum < 1 || tnum > 10){
+	  tnum = 4; 
+	}
         // TODO: your code here
         break;
       default:
@@ -157,19 +170,18 @@ int main(int argc, char **argv) {
       fprintf(stdout, "Receive: %llu %llu %llu\n", begin, end, mod);
 
       struct FactorialArgs args[tnum];
+      int part =((end - begin)/tnum);
       for (uint32_t i = 0; i < tnum; i++) {
         // TODO: parallel somehow
-        args[i].begin = 1;
-        args[i].end = 1;
-        args[i].mod = mod;
-
+        args[i].begin = i * part + 1;
+	args[i].end=(i == (tnum - 1) ) ? (end-begin): (i + 1) * part;
+	args[i].mod=mod;
         if (pthread_create(&threads[i], NULL, ThreadFactorial,
                            (void *)&args[i])) {
           printf("Error: pthread_create failed!\n");
           return 1;
         }
       }
-
       uint64_t total = 1;
       for (uint32_t i = 0; i < tnum; i++) {
         uint64_t result = 0;
