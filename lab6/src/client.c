@@ -15,6 +15,14 @@ struct Server {
   char ip[255];
   int port;
 };
+ typedef struct arg_str{
+  struct Server serverObj;
+  uint64_t begin;
+  uint64_t end;
+  int threadPlace;
+  int *res;
+} argsForThread;
+pthread_t *threads;
 
 char** readServers(int fd);
 int get_next_line(const int fd, char **line);
@@ -48,10 +56,10 @@ bool ConvertStringToUI64(const char *str, uint64_t *val) {
   *val = i;
   return true;
 }
-
+uint64_t mod = -1;
 int main(int argc, char **argv) {
   uint64_t k = -1;
-  uint64_t mod = -1;
+  //uint64_t mod = -1;
   char servers[255] = {'\0'}; // TODO: explain why 255
   int fd = 0;
   while (true) {
@@ -108,6 +116,7 @@ int main(int argc, char **argv) {
             argv[0]);
     return 1;
   }
+  char *args;
   // for one server here, rewrite with servers from file
   unsigned int servers_num = 1;
   // TODO: delete this and parallel work between servers
@@ -124,6 +133,7 @@ int main(int argc, char **argv) {
   servers_num = i;
   struct Server *to = malloc(sizeof(struct Server) * servers_num);
   char** split;
+  uint64_t part = k/servers_num;;
   for (int j = 0; j < servers_num; j++){ 
     split = strsplit(ret[j],':');
     printf("split ip = %s\n", split[0]);
@@ -135,16 +145,46 @@ int main(int argc, char **argv) {
     free(split[0]);
     free(split[1]);
     free(split);
-  } 
-  
-  
-  // TODO: work continiously, rewrite to make parallel
+  }
+  argsForThread argsForThread;
+  argsForThread->res =(int*)malloc(sizeof(int) * servers_num);
+  threads = (pthread_t*)malloc(threads_num *sizeof(pthread_t));
+  // TODO: work continiously, rewrite to make parallel 
   for (int i = 0; i < servers_num; i++) {
-    struct hostent *hostname = gethostbyname(to[i].ip);
-    if (hostname == NULL) {
-      fprintf(stderr, "gethostbyname failed with %s\n", to[i].ip);
-      exit(1);
+    argsForThread.serverObj = to[i];
+    argsForThread.begin = i*part+1;
+    argsForThread.end = (i == (servers_num - 1) ) ? k : (i + 1) * part;
+    argsForThread.threadPlace = i;
+    if (pthread_create(&threads[i], NULL, (void *)serversThread, (void*)&argsForThread)){
+      printf("Error creating thread!\n");
+      return 1;
     }
+    for (int i = 0; i < servers_num; i++){
+      if(pthread_join(threads[i], NULL != 0)){
+	perror("pthread_join");
+	exit(1);
+      }
+    }
+    // TODO: from one server
+    // unite results
+    uint64_t answer = 0;
+    memcpy(&answer, response, sizeof(uint64_t));
+    printf("answer: %llu\n", answer);
+
+    close(sck);
+  }
+  free(to);
+
+  return 0;
+}
+void serversThread(void* argsForThread){
+  argsForThread args = (argsForThread)(argsForThread);
+  struct Server* serverObj = (struct Server*)argsForThread->serverObj;
+  struct hostent *hostname = gethostbyname(serverObj.ip);
+  if (hostname == NULL) {
+    fprintf(stderr, "gethostbyname failed with %s\n", serverObj.ip);
+    exit(1);
+  }
     
     struct sockaddr_in server;
     server.sin_family = AF_INET;
@@ -164,12 +204,12 @@ int main(int argc, char **argv) {
 
     // TODO: for one server
     // parallel between servers
-    uint64_t begin = 1;
-    uint64_t end = k;
+    //uint64_t begin = 1;
+    //uint64_t end = k;
 
     char task[sizeof(uint64_t) * 3];
-    memcpy(task, &begin, sizeof(uint64_t));
-    memcpy(task + sizeof(uint64_t), &end, sizeof(uint64_t));
+    memcpy(task, &argsForThread->begin, sizeof(uint64_t));
+    memcpy(task + sizeof(uint64_t), &argsForThread->end, sizeof(uint64_t));
     memcpy(task + 2 * sizeof(uint64_t), &mod, sizeof(uint64_t));
 
     if (send(sck, task, sizeof(task), 0) < 0) {
@@ -182,19 +222,8 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Recieve failed\n");
       exit(1);
     }
-
-    // TODO: from one server
-    // unite results
-    uint64_t answer = 0;
-    memcpy(&answer, response, sizeof(uint64_t));
-    printf("answer: %llu\n", answer);
-
-    close(sck);
-  }
-  free(to);
-
-  return 0;
-}
+    
+} 
 char** readServers(int fd)
 {
   int result = 0;
