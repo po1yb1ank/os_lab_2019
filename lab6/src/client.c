@@ -16,7 +16,7 @@ struct Server {
   int port;
 };
 char** readServers(int fd);
-int get_next_line(const int fd, char **line){
+int get_next_line(const int fd, char **line);
 uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
   uint64_t result = 0;
   a = a % mod;
@@ -67,25 +67,20 @@ int main(int argc, char **argv) {
     switch (c) {
     case 0: {
       switch (option_index) {
-      case 0:
+      case 0: {
         ConvertStringToUI64(optarg, &k);
-        // TODO: your code here
-	if (k < -1){
-	  printf("assuming k as 2\n");
-	  k = 2;
-	}
+	printf("%d\n",k);
+	// TODO: your code here
         break;
-      case 1:
+      }
+      case 1:{
         ConvertStringToUI64(optarg, &mod);
         // TODO: your code here
-	if (mod < -1){
-	  printf("assuming mod as 2\n");
-	  mod = 2;
-	}
         break;
+      }
       case 2:
         // TODO: your code here
-	if (fd = open(optarg, O_RDONLY) < 0){
+	if ((fd = open(optarg, O_RDONLY)) < 0){
 	  printf("error opening servers file. Enter correct path");
 	  return 1;
 	}
@@ -109,17 +104,16 @@ int main(int argc, char **argv) {
             argv[0]);
     return 1;
   }
-
-  // TODO: for one server here, rewrite with servers from file
+  // for one server here, rewrite with servers from file
   unsigned int servers_num = 1;
   struct Server *to = malloc(sizeof(struct Server) * servers_num);
   // TODO: delete this and parallel work between servers
   //to[0].port = 20001;
   //memcpy(to[0].ip, "127.0.0.1", sizeof("127.0.0.1"));
-  char **ret;
+  char **ret = NULL;
   ret = readServers(fd);
-  while(ret++){
-    printf("%s\n",*ret);
+  for(int i = 0; i < 5; i++){
+    printf("%d - %s\n",i, ret[i]);
   }
   // TODO: work continiously, rewrite to make parallel
   for (int i = 0; i < servers_num; i++) {
@@ -184,13 +178,16 @@ char** readServers(int fd)
   char *line;
   char **values;
   int i = 0;
+  // printf("entry");
   values = (char**)malloc(5 * sizeof(char));
-  while ((result = get_next_line(fd, &line)) == 1)
-  {
-      values[i] = strdup(line); 
-      i++;
-      free(line);    
+  while ((result = get_next_line(fd, &line)) == 1){
+    printf("%s\n",line);
+    values[i] = strdup(line);
+    printf("%d - %s\n",i, values[i]);
+    i++;
+    free(line);    
   }
     values[i] = NULL;
     return values;
+ 
 }
