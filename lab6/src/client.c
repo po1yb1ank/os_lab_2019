@@ -15,8 +15,12 @@ struct Server {
   char ip[255];
   int port;
 };
+
 char** readServers(int fd);
 int get_next_line(const int fd, char **line);
+char** strsplit(const char* s, char d);
+
+
 uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
   uint64_t result = 0;
   a = a % mod;
@@ -106,15 +110,34 @@ int main(int argc, char **argv) {
   }
   // for one server here, rewrite with servers from file
   unsigned int servers_num = 1;
-  struct Server *to = malloc(sizeof(struct Server) * servers_num);
   // TODO: delete this and parallel work between servers
   //to[0].port = 20001;
   //memcpy(to[0].ip, "127.0.0.1", sizeof("127.0.0.1"));
+  //done
   char **ret = NULL;
   ret = readServers(fd);
-  for(int i = 0; i < 5; i++){
-    printf("%d - %s\n",i, ret[i]);
+  int i = 0;
+  while(ret[i]){
+    i++;
+    //printf("%s\n",ret[i]);
   }
+  servers_num = i;
+  struct Server *to = malloc(sizeof(struct Server) * servers_num);
+  char** split;
+  for (int j = 0; j < servers_num; j++){ 
+    split = strsplit(ret[j],':');
+    printf("split ip = %s\n", split[0]);
+    //memcpy(to[j].ip, split[0], sizeof(split[0]));
+    strcpy(to[j].ip, split[0]);
+    to[j].port = atoi(split[1]);
+    printf("%s:",to[j].ip);
+    printf("%d\n",to[j].port);
+    free(split[0]);
+    free(split[1]);
+    free(split);
+  } 
+  
+  
   // TODO: work continiously, rewrite to make parallel
   for (int i = 0; i < servers_num; i++) {
     struct hostent *hostname = gethostbyname(to[i].ip);
@@ -175,17 +198,18 @@ int main(int argc, char **argv) {
 char** readServers(int fd)
 {
   int result = 0;
-  char *line;
+  char *line = 0;
   char **values;
   int i = 0;
   // printf("entry");
-  values = (char**)malloc(5 * sizeof(char));
+  values = (char**)malloc(sizeof(char*));
   while ((result = get_next_line(fd, &line)) == 1){
-    printf("%s\n",line);
+    // printf("%s\n",line);
     values[i] = strdup(line);
-    printf("%d - %s\n",i, values[i]);
+    // printf("%d - %s\n",i, values[i]);
     i++;
-    free(line);    
+    values = (char**)realloc(values,sizeof(char*)*i+1);
+    // free(line);    
   }
     values[i] = NULL;
     return values;
