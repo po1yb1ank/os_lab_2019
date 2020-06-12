@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
+#include <fcntl.h>
 #include <errno.h>
 #include <getopt.h>
 #include <netdb.h>
@@ -11,12 +11,12 @@
 #include <netinet/ip.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-
 struct Server {
   char ip[255];
   int port;
 };
-
+char** readServers(int fd);
+int get_next_line(const int fd, char **line){
 uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
   uint64_t result = 0;
   a = a % mod;
@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
   uint64_t k = -1;
   uint64_t mod = -1;
   char servers[255] = {'\0'}; // TODO: explain why 255
-
+  int fd = 0;
   while (true) {
     int current_optind = optind ? optind : 1;
 
@@ -70,13 +70,25 @@ int main(int argc, char **argv) {
       case 0:
         ConvertStringToUI64(optarg, &k);
         // TODO: your code here
+	if (k < -1){
+	  printf("assuming k as 2\n");
+	  k = 2;
+	}
         break;
       case 1:
         ConvertStringToUI64(optarg, &mod);
         // TODO: your code here
+	if (mod < -1){
+	  printf("assuming mod as 2\n");
+	  mod = 2;
+	}
         break;
       case 2:
         // TODO: your code here
+	if (fd = open(optarg, O_RDONLY) < 0){
+	  printf("error opening servers file. Enter correct path");
+	  return 1;
+	}
         memcpy(servers, optarg, strlen(optarg));
         break;
       default:
@@ -102,9 +114,13 @@ int main(int argc, char **argv) {
   unsigned int servers_num = 1;
   struct Server *to = malloc(sizeof(struct Server) * servers_num);
   // TODO: delete this and parallel work between servers
-  to[0].port = 20001;
-  memcpy(to[0].ip, "127.0.0.1", sizeof("127.0.0.1"));
-
+  //to[0].port = 20001;
+  //memcpy(to[0].ip, "127.0.0.1", sizeof("127.0.0.1"));
+  char **ret;
+  ret = readServers(fd);
+  while(ret++){
+    printf("%s\n",*ret);
+  }
   // TODO: work continiously, rewrite to make parallel
   for (int i = 0; i < servers_num; i++) {
     struct hostent *hostname = gethostbyname(to[i].ip);
@@ -112,7 +128,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "gethostbyname failed with %s\n", to[i].ip);
       exit(1);
     }
-
+    
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_port = htons(to[i].port);
@@ -161,4 +177,20 @@ int main(int argc, char **argv) {
   free(to);
 
   return 0;
+}
+char** readServers(int fd)
+{
+  int result = 0;
+  char *line;
+  char **values;
+  int i = 0;
+  values = (char**)malloc(5 * sizeof(char));
+  while ((result = get_next_line(fd, &line)) == 1)
+  {
+      values[i] = strdup(line); 
+      i++;
+      free(line);    
+  }
+    values[i] = NULL;
+    return values;
 }
