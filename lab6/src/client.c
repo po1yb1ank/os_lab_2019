@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,16 +20,13 @@ struct Server {
   struct Server serverObj;
   uint64_t begin;
   uint64_t end;
-  int threadPlace;
-  int *res;
 } argsForThread;
 pthread_t *threads;
 
 char** readServers(int fd);
 int get_next_line(const int fd, char **line);
 char** strsplit(const char* s, char d);
-
-
+void* serversThread(void* argsForThread);
 uint64_t MultModulo(uint64_t a, uint64_t b, uint64_t mod) {
   uint64_t result = 0;
   a = a % mod;
@@ -133,62 +131,67 @@ int main(int argc, char **argv) {
   servers_num = i;
   struct Server *to = malloc(sizeof(struct Server) * servers_num);
   char** split;
-  uint64_t part = k/servers_num;;
+  uint64_t part = k/servers_num;
   for (int j = 0; j < servers_num; j++){ 
     split = strsplit(ret[j],':');
-    printf("split ip = %s\n", split[0]);
-    //memcpy(to[j].ip, split[0], sizeof(split[0]));
-    strcpy(to[j].ip, split[0]);
+    //printf("split ip = %s\n", split[0]);
+    memcpy(to[j].ip, split[0], strlen(split[0]));
+    //to[j].ip[9] = '\0';
+    //strcpy(&to[j].ip, split[0]);
+    //to[j].ip[9] = '\0';
     to[j].port = atoi(split[1]);
     printf("%s:",to[j].ip);
     printf("%d\n",to[j].port);
-    free(split[0]);
-    free(split[1]);
-    free(split);
+    printf("j = %d\n",j);
+    //free(split[0]);
+    //free(split[1]);
+    //free(split);
   }
+  close(fd);
+  printf("************");
   argsForThread argsForThread;
-  argsForThread->res =(int*)malloc(sizeof(int) * servers_num);
-  threads = (pthread_t*)malloc(threads_num *sizeof(pthread_t));
+  //argsForThread->res =(int*)malloc(sizeof(int) * servers_num);
+  threads = (pthread_t*)malloc(sizeof(pthread_t) * servers_num);
   // TODO: work continiously, rewrite to make parallel 
+  uint64_t result = 0;
+  uint64_t answer = 1;
   for (int i = 0; i < servers_num; i++) {
-    argsForThread.serverObj = to[i];
+    argsForThread.serverObj = to[i];    
     argsForThread.begin = i*part+1;
     argsForThread.end = (i == (servers_num - 1) ) ? k : (i + 1) * part;
-    argsForThread.threadPlace = i;
     if (pthread_create(&threads[i], NULL, (void *)serversThread, (void*)&argsForThread)){
       printf("Error creating thread!\n");
       return 1;
     }
     for (int i = 0; i < servers_num; i++){
-      if(pthread_join(threads[i], NULL != 0)){
+      if(pthread_join(threads[i],(void**)&result) != 0){
 	perror("pthread_join");
 	exit(1);
       }
     }
+    answer = MultModulo(answer, result, mod);
     // TODO: from one server
     // unite results
     uint64_t answer = 0;
-    memcpy(&answer, response, sizeof(uint64_t));
-    printf("answer: %llu\n", answer);
-
-    close(sck);
+    // memcpy(&answer, response, sizeof(uint64_t));
   }
-  free(to);
+  printf("answer: %llu\n", answer);
+  //free(to);
 
   return 0;
 }
-void serversThread(void* argsForThread){
-  argsForThread args = (argsForThread)(argsForThread);
-  struct Server* serverObj = (struct Server*)argsForThread->serverObj;
-  struct hostent *hostname = gethostbyname(serverObj.ip);
+void* serversThread(void* arguments){
+  argsForThread *args = (argsForThread*)arguments;
+  //struct Server* serverObj = args->serverObj;
+  struct hostent *hostname = gethostbyname(args->serverObj.ip);
   if (hostname == NULL) {
-    fprintf(stderr, "gethostbyname failed with %s\n", serverObj.ip);
+    fprintf(stderr, "gethostbyname failed with %s\n", args->serverObj.ip);
     exit(1);
   }
     
     struct sockaddr_in server;
     server.sin_family = AF_INET;
-    server.sin_port = htons(to[i].port);
+    server.sin_port = htons(args->serverObj.port);
     server.sin_addr.s_addr = *((unsigned long *)hostname->h_addr);
 
     int sck = socket(AF_INET, SOCK_STREAM, 0);
@@ -208,8 +211,8 @@ void serversThread(void* argsForThread){
     //uint64_t end = k;
 
     char task[sizeof(uint64_t) * 3];
-    memcpy(task, &argsForThread->begin, sizeof(uint64_t));
-    memcpy(task + sizeof(uint64_t), &argsForThread->end, sizeof(uint64_t));
+    memcpy(task, &args->begin, sizeof(uint64_t));
+    memcpy(task + sizeof(uint64_t), &args->end, sizeof(uint64_t));
     memcpy(task + 2 * sizeof(uint64_t), &mod, sizeof(uint64_t));
 
     if (send(sck, task, sizeof(task), 0) < 0) {
@@ -222,7 +225,10 @@ void serversThread(void* argsForThread){
       fprintf(stderr, "Recieve failed\n");
       exit(1);
     }
-    
+    uint64_t res;
+    memcpy(&res, response, sizeof(uint64_t));
+    close(sck);
+    return (void*)(uint64_t*)res;
 } 
 char** readServers(int fd)
 {
