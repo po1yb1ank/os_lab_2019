@@ -22,7 +22,7 @@ struct Server {
   uint64_t end;
 } argsForThread;
 pthread_t *threads;
-
+pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
 char** readServers(int fd);
 int get_next_line(const int fd, char **line);
 char** strsplit(const char* s, char d);
@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
   for (int j = 0; j < servers_num; j++){ 
     split = strsplit(ret[j],':');
     //printf("split ip = %s\n", split[0]);
-    memcpy(to[j].ip, split[0], strlen(split[0]));
+    memcpy(&to[j].ip, split[0], strlen(split[0]));
     //to[j].ip[9] = '\0';
     //strcpy(&to[j].ip, split[0]);
     //to[j].ip[9] = '\0';
@@ -149,35 +149,35 @@ int main(int argc, char **argv) {
   }
   close(fd);
   printf("************");
-  argsForThread argsForThread;
   //argsForThread->res =(int*)malloc(sizeof(int) * servers_num);
   threads = (pthread_t*)malloc(sizeof(pthread_t) * servers_num);
   // TODO: work continiously, rewrite to make parallel 
   uint64_t result = 0;
   uint64_t answer = 1;
+  argsForThread* argsArray = (argsForThread*)malloc(sizeof(argsForThread) * servers_num);
   for (int i = 0; i < servers_num; i++) {
-    argsForThread.serverObj = to[i];    
-    argsForThread.begin = i*part+1;
-    argsForThread.end = (i == (servers_num - 1) ) ? k : (i + 1) * part;
-    if (pthread_create(&threads[i], NULL, (void *)serversThread, (void*)&argsForThread)){
+    //argsForThread* argsForThread = (argsForThread)malloc(sizeof(argsForThread));
+    argsArray[i].serverObj = to[i];    
+    argsArray[i].begin = i*part+1;
+    argsArray[i].end = (i == (servers_num - 1) ) ? k : (i + 1) * part;
+    if (pthread_create(&threads[i], NULL, (void *)serversThread, (void*)&argsArray[i])){
       printf("Error creating thread!\n");
       return 1;
     }
-    for (int i = 0; i < servers_num; i++){
+    // TODO: from one server
+    // unite results
+    //uint64_t answer = 0;
+    // memcpy(&answer, response, sizeof(uint64_t));
+  }
+  for (int i = 0; i < servers_num; i++){
       if(pthread_join(threads[i],(void**)&result) != 0){
 	perror("pthread_join");
 	exit(1);
       }
-    }
-    answer = MultModulo(answer, result, mod);
-    // TODO: from one server
-    // unite results
-    uint64_t answer = 0;
-    // memcpy(&answer, response, sizeof(uint64_t));
   }
+  answer = MultModulo(answer, result, mod);
   printf("answer: %llu\n", answer);
   //free(to);
-
   return 0;
 }
 void* serversThread(void* arguments){
@@ -193,7 +193,7 @@ void* serversThread(void* arguments){
     server.sin_family = AF_INET;
     server.sin_port = htons(args->serverObj.port);
     server.sin_addr.s_addr = *((unsigned long *)hostname->h_addr);
-
+    printf("%s:%d\n",args->serverObj.ip,args->serverObj.port);
     int sck = socket(AF_INET, SOCK_STREAM, 0);
     if (sck < 0) {
       fprintf(stderr, "Socket creation failed!\n");
@@ -209,7 +209,7 @@ void* serversThread(void* arguments){
     // parallel between servers
     //uint64_t begin = 1;
     //uint64_t end = k;
-
+    pthread_mutex_lock(&mut);
     char task[sizeof(uint64_t) * 3];
     memcpy(task, &args->begin, sizeof(uint64_t));
     memcpy(task + sizeof(uint64_t), &args->end, sizeof(uint64_t));
@@ -219,7 +219,7 @@ void* serversThread(void* arguments){
       fprintf(stderr, "Send failed\n");
       exit(1);
     }
-
+    pthread_mutex_unlock(&mut);
     char response[sizeof(uint64_t)];
     if (recv(sck, response, sizeof(response), 0) < 0) {
       fprintf(stderr, "Recieve failed\n");
